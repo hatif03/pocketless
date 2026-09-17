@@ -1,0 +1,27 @@
+---
+description: Live AssemblyAI docs, auth, models, and never-client-key rules
+alwaysApply: true
+---
+
+# AssemblyAI
+
+Before writing AssemblyAI code, fetch https://www.assemblyai.com/docs/agent-instructions.md and https://www.assemblyai.com/docs/llms.txt. Do not trust memorized params.
+
+Use the official `assemblyai` JS SDK (`npm i assemblyai@latest`) unless the Voice Agent WebSocket has no SDK helper — then follow live Voice Agent API docs.
+
+## Auth
+
+- REST `/v2/*`, streaming STT token + WS, LLM Gateway: `Authorization: <raw key>` (no Bearer).
+- Voice Agent API token + WS (`agents.assemblyai.com`): `Authorization: Bearer <key>`.
+- Browser/mobile: mint a single-use temp token on the server. Never ship the project key.
+
+## Models and deprecations
+
+- Default STT: `universal-3-5-pro` (streaming: `speech_model`; pre-recorded: `speech_models: ["universal-3-5-pro", "universal-2"]`).
+- Forbidden: LeMUR, `auto_chapters`, `summarization`, `summary_model`, `summary_type`, `u3-rt-pro`, hallucinated SDK enums.
+- Summaries, action items, chapters: transcribe first, then LLM Gateway (`claude-sonnet-4-6` or current IDs from docs).
+- Always `Terminate` streaming STT sessions.
+
+## This product
+
+Live talk: Voice Agent API (or streaming STT + Gateway if we need custom TTS). Post-call: pre-recorded STT with `speaker_labels`, then Gateway for brief + promises. Keyterms: Pocketless, person names, product terms.

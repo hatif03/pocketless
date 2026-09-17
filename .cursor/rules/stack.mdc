@@ -1,0 +1,16 @@
+---
+description: Next.js / tRPC / Drizzle conventions for this repo
+globs: src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Stack conventions
+
+- App Router only. Server secrets in `src/lib/*` and route handlers; `"server-only"` for AssemblyAI and Recall keys.
+- Domain logic in `src/modules/<domain>/`. Register routers in `src/trpc/routers/_app.ts`.
+- Capture pipes implement `src/lib/pipes`. Do not couple Voice Agent or DB to Recall.
+- Mutations/queries: tRPC + TanStack Query. Zod inputs.
+- DB: Drizzle on Neon. `src/db/schema.ts`. `npm run db:push`.
+- Post-session: Inngest, not a blocking request.
+- UI: existing shadcn. No Polar, no Stream Video.
+- LLM work goes through AssemblyAI LLM Gateway. No OpenAI SDK.

@@ -1,0 +1,24 @@
+---
+description: Pocketless product, hackathon slice, and SaaS-shaped decisions
+alwaysApply: true
+---
+
+# Pocketless
+
+Coworker in **their** Google Meet. Silent until “Pocketless, …”. Memory is people + promises. We do not host the call.
+
+## Hackathon (by 30 Sep 2026)
+
+Ship: paste Meet URL → Recall bot joins, You/Them/Pocketless observer lanes, wake-name gating, seeded Priya, post-session brief on the person card, Talk-to-Pocketless.
+
+Do not ship: hosted WebRTC room, Zoom/Teams bots, companion, Polar, MagSafe, 12 OAuth integrations.
+
+## After hackathon
+
+See `docs/after-hackathon.md`. Zoom/Teams adapters, companion, RevenueCat.
+
+## UX
+
+- Home = roster, not recordings.
+- Transcript one click down on an episode.
+- Humans stay in Google Meet. Dashboard is an observer.
