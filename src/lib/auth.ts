@@ -13,7 +13,11 @@ export const auth = betterAuth({
       // Calendar/Gmail scopes are requested separately via authClient.linkSocial
       // from the settings page, so signing in with Google never prompts for them.
       accessType: "offline",
-      prompt: "select_account+consent",
+      // "consent" is what actually matters here — it forces Google to reissue
+      // a refresh token on repeat logins. Better Auth's type also offers
+      // "select_account+consent", but Google's real endpoint parses that as
+      // one literal (invalid) prompt value and 400s — confirmed live.
+      prompt: "consent",
     },
   },
   emailAndPassword: {
