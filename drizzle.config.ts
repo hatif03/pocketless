@@ -6,6 +6,8 @@ export default defineConfig({
   schema: "./src/db/schema.ts",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL!,
+    // Neon's pooled DATABASE_URL runs through PgBouncer in transaction mode,
+    // which migrations can fail against — use the direct/unpooled URL here.
+    url: process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL!,
   },
 });
