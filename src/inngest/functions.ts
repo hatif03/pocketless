@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { callSessions } from "@/db/schema";
-import { writePostSessionBrief } from "@/lib/agent-tools";
+import { buildKeyterms, writePostSessionBrief } from "@/lib/agent-tools";
 import { transcribeRecording } from "@/lib/assemblyai/transcribe";
 import { inngest } from "@/inngest/client";
 
@@ -25,11 +25,15 @@ export const sessionProcessing = inngest.createFunction(
       return { skipped: true };
     }
 
+    if (session.status === "completed") {
+      return { skipped: true, reason: "already completed" };
+    }
+
     let transcription: Awaited<ReturnType<typeof transcribeRecording>> | null =
       null;
     if (recordingUrl) {
       transcription = await step.run("transcribe", async () => {
-        const names = ["Pocketless"];
+        const names = await buildKeyterms(sessionId, 1000);
         return transcribeRecording(recordingUrl, names);
       });
     }

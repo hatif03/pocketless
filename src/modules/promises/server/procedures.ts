@@ -47,6 +47,16 @@ export const promisesRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const [person] = await db
+        .select()
+        .from(people)
+        .where(
+          and(eq(people.id, input.personId), eq(people.userId, ctx.auth.user.id)),
+        );
+      if (!person) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
       const [created] = await db
         .insert(promises)
         .values({

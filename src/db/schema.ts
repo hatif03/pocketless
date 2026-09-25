@@ -6,6 +6,7 @@ import {
   boolean,
   pgEnum,
   integer,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
@@ -64,20 +65,24 @@ export const verification = pgTable("verification", {
   updatedAt: timestamp("updated_at").$defaultFn(() => new Date()),
 });
 
-export const people = pgTable("people", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => nanoid()),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  aliases: text("aliases"),
-  relationshipBrief: text("relationship_brief"),
-  lastSpokeAt: timestamp("last_spoke_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+export const people = pgTable(
+  "people",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => nanoid()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    aliases: text("aliases"),
+    relationshipBrief: text("relationship_brief"),
+    lastSpokeAt: timestamp("last_spoke_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("people_user_idx").on(table.userId)],
+);
 
 export const promiseStatus = pgEnum("promise_status", [
   "open",
@@ -85,23 +90,30 @@ export const promiseStatus = pgEnum("promise_status", [
   "dropped",
 ]);
 
-export const promises = pgTable("promises", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => nanoid()),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  personId: text("person_id")
-    .notNull()
-    .references(() => people.id, { onDelete: "cascade" }),
-  text: text("text").notNull(),
-  dueAt: timestamp("due_at"),
-  status: promiseStatus("status").notNull().default("open"),
-  sourceSessionId: text("source_session_id"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+export const promises = pgTable(
+  "promises",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => nanoid()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    text: text("text").notNull(),
+    dueAt: timestamp("due_at"),
+    status: promiseStatus("status").notNull().default("open"),
+    sourceSessionId: text("source_session_id"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("promises_user_status_idx").on(table.userId, table.status),
+    index("promises_person_idx").on(table.personId),
+  ],
+);
 
 export const decisions = pgTable("decisions", {
   id: text("id")
@@ -132,96 +144,119 @@ export const callSessionStatus = pgEnum("call_session_status", [
   "failed",
 ]);
 
-export const callSessions = pgTable("call_sessions", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => nanoid()),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  personId: text("person_id").references(() => people.id, {
-    onDelete: "set null",
-  }),
-  meetingUrl: text("meeting_url").notNull(),
-  provider: callProvider("provider").notNull().default("google_meet"),
-  recallBotId: text("recall_bot_id"),
-  status: callSessionStatus("status").notNull().default("queued"),
-  recordingUrl: text("recording_url"),
-  liveYou: text("live_you"),
-  liveThem: text("live_them"),
-  livePocketless: text("live_pocketless"),
-  agentStatus: text("agent_status").notNull().default("silent"),
-  participantsJson: text("participants_json"),
-  lastTool: text("last_tool"),
-  startedAt: timestamp("started_at"),
-  endedAt: timestamp("ended_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+export const callSessions = pgTable(
+  "call_sessions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => nanoid()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    personId: text("person_id").references(() => people.id, {
+      onDelete: "set null",
+    }),
+    meetingUrl: text("meeting_url").notNull(),
+    provider: callProvider("provider").notNull().default("google_meet"),
+    recallBotId: text("recall_bot_id"),
+    status: callSessionStatus("status").notNull().default("queued"),
+    recordingUrl: text("recording_url"),
+    liveYou: text("live_you"),
+    liveThem: text("live_them"),
+    livePocketless: text("live_pocketless"),
+    agentStatus: text("agent_status").notNull().default("silent"),
+    participantsJson: text("participants_json"),
+    lastTool: text("last_tool"),
+    startedAt: timestamp("started_at"),
+    endedAt: timestamp("ended_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("call_sessions_user_idx").on(table.userId)],
+);
 
-export const episodes = pgTable("episodes", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => nanoid()),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  personId: text("person_id")
-    .notNull()
-    .references(() => people.id, { onDelete: "cascade" }),
-  sessionId: text("session_id").references(() => callSessions.id, {
-    onDelete: "set null",
-  }),
-  title: text("title").notNull(),
-  brief: text("brief"),
-  transcript: text("transcript"),
-  transcriptJson: text("transcript_json"),
-  topics: text("topics"),
-  entitiesJson: text("entities_json"),
-  sentimentJson: text("sentiment_json"),
-  youSpeakerLabel: text("you_speaker_label"),
-  occurredAt: timestamp("occurred_at").notNull().defaultNow(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const episodes = pgTable(
+  "episodes",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => nanoid()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").references(() => callSessions.id, {
+      onDelete: "set null",
+    }),
+    title: text("title").notNull(),
+    brief: text("brief"),
+    transcript: text("transcript"),
+    transcriptJson: text("transcript_json"),
+    topics: text("topics"),
+    entitiesJson: text("entities_json"),
+    sentimentJson: text("sentiment_json"),
+    youSpeakerLabel: text("you_speaker_label"),
+    occurredAt: timestamp("occurred_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("episodes_user_person_idx").on(table.userId, table.personId),
+  ],
+);
 
 export const chunkKind = pgEnum("chunk_kind", ["brief", "transcript_chunk"]);
 
-export const memoryChunks = pgTable("memory_chunks", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => nanoid()),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  personId: text("person_id")
-    .notNull()
-    .references(() => people.id, { onDelete: "cascade" }),
-  episodeId: text("episode_id")
-    .notNull()
-    .references(() => episodes.id, { onDelete: "cascade" }),
-  kind: chunkKind("kind").notNull(),
-  content: text("content").notNull(),
-  speaker: text("speaker"),
-  startMs: integer("start_ms"),
-  endMs: integer("end_ms"),
-  chunkIndex: integer("chunk_index").notNull().default(0),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const memoryChunks = pgTable(
+  "memory_chunks",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => nanoid()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    episodeId: text("episode_id")
+      .notNull()
+      .references(() => episodes.id, { onDelete: "cascade" }),
+    kind: chunkKind("kind").notNull(),
+    content: text("content").notNull(),
+    speaker: text("speaker"),
+    startMs: integer("start_ms"),
+    endMs: integer("end_ms"),
+    chunkIndex: integer("chunk_index").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("memory_chunks_user_person_idx").on(table.userId, table.personId),
+    index("memory_chunks_episode_idx").on(table.episodeId),
+  ],
+);
 
-export const talkMessages = pgTable("talk_messages", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => nanoid()),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  personId: text("person_id")
-    .notNull()
-    .references(() => people.id, { onDelete: "cascade" }),
-  role: text("role").notNull(),
-  content: text("content").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const talkMessages = pgTable(
+  "talk_messages",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => nanoid()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("talk_messages_user_person_idx").on(table.userId, table.personId),
+  ],
+);
 
 export const mockOutbox = pgTable("mock_outbox", {
   id: text("id")

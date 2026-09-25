@@ -28,12 +28,18 @@ export function EpisodeView() {
 
   const setYouSpeaker = useMutation(
     trpc.episodes.setYouSpeaker.mutationOptions({
-      onSuccess: () => void queryClient.invalidateQueries(),
+      onSuccess: () =>
+        void queryClient.invalidateQueries(
+          trpc.episodes.getOne.queryFilter({ id: episodeId }),
+        ),
     }),
   );
   const addToRoster = useMutation(
     trpc.people.create.mutationOptions({
-      onSuccess: () => void queryClient.invalidateQueries(),
+      onSuccess: () => {
+        void queryClient.invalidateQueries(trpc.people.getMany.queryFilter());
+        void queryClient.invalidateQueries(trpc.people.roster.queryFilter());
+      },
     }),
   );
 

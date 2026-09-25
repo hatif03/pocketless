@@ -18,6 +18,7 @@ import { ErrorState } from "@/components/error-state";
 import { useTRPC } from "@/trpc/client";
 import { SendPocketlessDialog } from "@/modules/sessions/ui/components/send-pocketless-dialog";
 import { MindMap } from "@/modules/people/ui/components/mind-map";
+import { useSetPromiseStatusMutation } from "@/modules/promises/hooks/use-set-promise-status";
 import { Badge } from "@/components/ui/badge";
 
 export function PersonView() {
@@ -46,13 +47,7 @@ export function PersonView() {
       },
     }),
   );
-  const setStatus = useMutation(
-    trpc.promises.setStatus.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries();
-      },
-    }),
-  );
+  const setStatus = useSetPromiseStatusMutation();
 
   if (person.isPending) {
     return <LoadingState title="Loading person" description="Memory card" />;

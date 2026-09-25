@@ -21,7 +21,7 @@ export async function transcribeRecording(audioUrl: string, keyterms: string[]) 
     audio: audioUrl,
     speaker_labels: true,
     speech_models: ["universal-3-5-pro", "universal-2"],
-    keyterms_prompt: keyterms.slice(0, 100),
+    keyterms_prompt: keyterms.slice(0, 1000),
     sentiment_analysis: true,
     entity_detection: true,
     // Narrow, non-product-relevant redaction only — this app's value is

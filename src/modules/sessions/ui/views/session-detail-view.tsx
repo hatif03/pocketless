@@ -35,12 +35,18 @@ export function SessionDetailView() {
   const queryClient = useQueryClient();
   const session = useQuery({
     ...trpc.sessions.getOne.queryOptions({ id: sessionId }),
-    refetchInterval: 2000,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "completed" || status === "failed" ? false : 2000;
+    },
   });
   const stop = useMutation(
     trpc.sessions.stop.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries();
+        void queryClient.invalidateQueries(
+          trpc.sessions.getOne.queryFilter({ id: sessionId }),
+        );
+        void queryClient.invalidateQueries(trpc.sessions.getMany.queryFilter());
       },
     }),
   );

@@ -22,9 +22,9 @@ export async function searchMemory(input: {
   const k = input.k ?? 5;
   if (!input.query.trim()) return [];
 
-  // ponytail: to_tsvector computed at query time, no stored column or GIN
-  // index — fine at hackathon-demo data volume, add an index if a person's
-  // transcript corpus grows large enough for this to show up as a slow query.
+  // Full-text search runs inside the live voice-agent tool-call path, so it's
+  // backed by a stored, generated tsvector column + GIN index (see
+  // scripts/add-memory-search-index.ts) rather than computed per-query.
   const result = await db.execute<{
     episode_id: string;
     kind: "brief" | "transcript_chunk";
@@ -37,8 +37,8 @@ export async function searchMemory(input: {
     FROM memory_chunks
     WHERE user_id = ${input.userId}
       ${input.personId ? sql`AND person_id = ${input.personId}` : sql``}
-      AND to_tsvector('english', content) @@ plainto_tsquery('english', ${input.query})
-    ORDER BY ts_rank(to_tsvector('english', content), plainto_tsquery('english', ${input.query})) DESC
+      AND content_tsv @@ plainto_tsquery('english', ${input.query})
+    ORDER BY ts_rank(content_tsv, plainto_tsquery('english', ${input.query})) DESC
     LIMIT ${k}
   `);
 

@@ -18,6 +18,27 @@ import { indexEpisode } from "@/lib/memory/index-episode";
 import { searchMemory } from "@/lib/memory/search";
 import { createCalendarEvent, createGmailDraft } from "@/lib/google/calendar-gmail";
 
+async function mockFallback(
+  userId: string,
+  kind: "email" | "calendar",
+  payload: Record<string, unknown>,
+  reason: "not_connected" | "google_api_error" | "invalid_datetime",
+  error?: unknown,
+) {
+  await db.insert(mockOutbox).values({
+    userId,
+    kind,
+    payload: JSON.stringify(payload),
+  });
+  return {
+    ok: true,
+    mocked: true,
+    reason,
+    ...(error instanceof Error ? { detail: error.message.slice(0, 200) } : {}),
+    ...payload,
+  };
+}
+
 export async function runAgentTool(input: {
   sessionId: string;
   name: string;
@@ -112,15 +133,11 @@ export async function runAgentTool(input: {
       if (draft) {
         return { ok: true, mocked: false, draftId: draft.id, ...payload };
       }
+      return mockFallback(session.userId, "email", payload, "not_connected");
     } catch (error) {
       console.error("Gmail draft failed, falling back to mock", error);
+      return mockFallback(session.userId, "email", payload, "google_api_error", error);
     }
-    await db.insert(mockOutbox).values({
-      userId: session.userId,
-      kind: "email",
-      payload: JSON.stringify(payload),
-    });
-    return { ok: true, mocked: true, reason: "not_connected", ...payload };
   }
 
   if (input.name === "hold_calendar") {
@@ -129,27 +146,29 @@ export async function runAgentTool(input: {
       startTime: input.args.startTime ? String(input.args.startTime) : undefined,
       endTime: input.args.endTime ? String(input.args.endTime) : undefined,
     };
-    if (payload.startTime && payload.endTime) {
-      try {
-        const event = await createCalendarEvent({
-          userId: session.userId,
-          title: payload.title,
-          startTime: payload.startTime,
-          endTime: payload.endTime,
-        });
-        if (event) {
-          return { ok: true, mocked: false, eventUrl: event.url, ...payload };
-        }
-      } catch (error) {
-        console.error("Calendar event failed, falling back to mock", error);
-      }
+    if (
+      !payload.startTime ||
+      !payload.endTime ||
+      Number.isNaN(Date.parse(payload.startTime)) ||
+      Number.isNaN(Date.parse(payload.endTime))
+    ) {
+      return mockFallback(session.userId, "calendar", payload, "invalid_datetime");
     }
-    await db.insert(mockOutbox).values({
-      userId: session.userId,
-      kind: "calendar",
-      payload: JSON.stringify(payload),
-    });
-    return { ok: true, mocked: true, reason: "not_connected", ...payload };
+    try {
+      const event = await createCalendarEvent({
+        userId: session.userId,
+        title: payload.title,
+        startTime: payload.startTime,
+        endTime: payload.endTime,
+      });
+      if (event) {
+        return { ok: true, mocked: false, eventUrl: event.url, ...payload };
+      }
+      return mockFallback(session.userId, "calendar", payload, "not_connected");
+    } catch (error) {
+      console.error("Calendar event failed, falling back to mock", error);
+      return mockFallback(session.userId, "calendar", payload, "google_api_error", error);
+    }
   }
 
   if (input.name === "note_decision") {
@@ -165,6 +184,32 @@ export async function runAgentTool(input: {
   }
 
   return { error: `Unknown tool ${input.name}` };
+}
+
+export async function buildKeyterms(sessionId: string, cap = 100) {
+  const [session] = await db
+    .select()
+    .from(callSessions)
+    .where(eq(callSessions.id, sessionId));
+
+  const keyterms = ["Pocketless"];
+  if (session?.personId) {
+    const [person] = await db
+      .select()
+      .from(people)
+      .where(eq(people.id, session.personId));
+    if (person?.name) keyterms.push(person.name);
+    if (person?.aliases) {
+      keyterms.push(
+        ...person.aliases
+          .split(",")
+          .map((alias) => alias.trim())
+          .filter(Boolean),
+      );
+    }
+  }
+
+  return [...new Set(keyterms)].slice(0, cap);
 }
 
 export async function buildVoiceSystemPrompt(sessionId: string) {
@@ -216,11 +261,9 @@ export async function writePostSessionBrief(
   if (!session?.personId) {
     return;
   }
+  const personId = session.personId;
 
-  const [person] = await db
-    .select()
-    .from(people)
-    .where(eq(people.id, session.personId));
+  const [person] = await db.select().from(people).where(eq(people.id, personId));
 
   const raw = await gatewayChat({
     json: true,
@@ -249,7 +292,7 @@ export async function writePostSessionBrief(
     .insert(episodes)
     .values({
       userId: session.userId,
-      personId: session.personId,
+      personId,
       sessionId: session.id,
       title: `Google Meet with ${person?.name ?? "them"}`,
       brief,
@@ -271,16 +314,20 @@ export async function writePostSessionBrief(
       lastSpokeAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(eq(people.id, session.personId));
+    .where(eq(people.id, personId));
 
-  for (const text of parsed.promises ?? []) {
-    if (!text.trim()) continue;
-    await db.insert(promises).values({
-      userId: session.userId,
-      personId: session.personId,
-      text: text.trim(),
-      sourceSessionId: session.id,
-    });
+  const promiseTexts = (parsed.promises ?? [])
+    .map((text) => text.trim())
+    .filter(Boolean);
+  if (promiseTexts.length > 0) {
+    await db.insert(promises).values(
+      promiseTexts.map((text) => ({
+        userId: session.userId,
+        personId,
+        text,
+        sourceSessionId: session.id,
+      })),
+    );
   }
 
   await indexEpisode(episode.id);

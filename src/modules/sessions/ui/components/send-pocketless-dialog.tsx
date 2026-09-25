@@ -49,7 +49,7 @@ export function SendPocketlessDialog({
         toast.success("Pocketless is joining the Google Meet");
         onOpenChange(false);
         setMeetingUrl("");
-        void queryClient.invalidateQueries();
+        void queryClient.invalidateQueries(trpc.sessions.getMany.queryFilter());
         router.push(`/sessions/${session.id}`);
       },
       onError: (error) => {

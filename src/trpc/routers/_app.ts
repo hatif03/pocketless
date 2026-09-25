@@ -1,5 +1,6 @@
 import { peopleRouter } from "@/modules/people/server/procedures";
 import { promisesRouter } from "@/modules/promises/server/procedures";
+import { settingsRouter } from "@/modules/settings/server/procedures";
 import {
   episodesRouter,
   sessionsRouter,
@@ -14,6 +15,7 @@ export const appRouter = createTRPCRouter({
   sessions: sessionsRouter,
   episodes: episodesRouter,
   talk: talkRouter,
+  settings: settingsRouter,
 });
 
 export type AppRouter = typeof appRouter;

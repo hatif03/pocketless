@@ -75,9 +75,7 @@ export async function seedPriyaForUser(userId: string) {
     dueAt: new Date("2026-09-20T17:00:00Z"),
   });
 
-  for (const episode of seededEpisodes) {
-    await indexEpisode(episode.id);
-  }
+  await Promise.all(seededEpisodes.map((episode) => indexEpisode(episode.id)));
 
   return priya.id;
 }

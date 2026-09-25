@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
-
-type LinkedAccount = { provider: string };
+import { useTRPC } from "@/trpc/client";
 
 const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
@@ -13,19 +13,15 @@ const GOOGLE_SCOPES = [
 ];
 
 export function SettingsView() {
-  const [accounts, setAccounts] = useState<LinkedAccount[] | null>(null);
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const googleStatus = useQuery(trpc.settings.googleStatus.queryOptions());
 
-  const refresh = async () => {
-    const { data } = await authClient.listAccounts();
-    setAccounts(data ?? []);
-  };
+  const refresh = () =>
+    queryClient.invalidateQueries(trpc.settings.googleStatus.queryFilter());
 
-  useEffect(() => {
-    void refresh();
-  }, []);
-
-  const connected = (providerId: string) =>
-    accounts?.some((a) => a.provider === providerId) ?? false;
+  const hasFullScopes = googleStatus.data?.hasFullScopes ?? false;
+  const linked = googleStatus.data?.linked ?? false;
 
   return (
     <div className="flex flex-col gap-4 py-4 px-4 md:px-8 max-w-xl">
@@ -39,34 +35,53 @@ export function SettingsView() {
         <div>
           <p className="text-sm font-medium">Google Calendar &amp; Gmail</p>
           <p className="text-xs text-muted-foreground">
-            {connected("google") ? "Connected" : "Not connected"}
+            {hasFullScopes
+              ? "Connected"
+              : linked
+                ? "Signed in with Google — Calendar & Gmail access not yet granted"
+                : "Not connected"}
           </p>
         </div>
-        {connected("google") ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              await authClient.unlinkAccount({ providerId: "google" });
-              await refresh();
-            }}
-          >
-            Disconnect
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            onClick={() =>
-              authClient.linkSocial({
-                provider: "google",
-                scopes: GOOGLE_SCOPES,
-                callbackURL: "/settings",
-              })
-            }
-          >
-            Connect
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {linked && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await authClient.unlinkAccount({ providerId: "google" });
+                  toast.success("Disconnected Google");
+                } catch {
+                  toast.error(
+                    "Couldn't disconnect — Google may be your only sign-in method",
+                  );
+                } finally {
+                  await refresh();
+                }
+              }}
+            >
+              Disconnect
+            </Button>
+          )}
+          {!hasFullScopes && (
+            <Button
+              size="sm"
+              onClick={async () => {
+                try {
+                  await authClient.linkSocial({
+                    provider: "google",
+                    scopes: GOOGLE_SCOPES,
+                    callbackURL: "/settings",
+                  });
+                } catch {
+                  toast.error("Couldn't start Google connect flow");
+                }
+              }}
+            >
+              {linked ? "Grant Calendar & Gmail access" : "Connect"}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

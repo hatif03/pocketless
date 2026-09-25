@@ -40,6 +40,10 @@ export async function gatewayChat(input: {
     body: JSON.stringify({
       model: "qwen3.5-4b-32k-fast",
       messages,
+      // Additive: repairs near-miss JSON server-side. Kept alongside the
+      // manual fence-strip/try-catch fallback in callers since this
+      // account's model tier support for the field isn't confirmed.
+      ...(input.json ? { post_processing_steps: [{ type: "json-repair" }] } : {}),
     }),
   });
 

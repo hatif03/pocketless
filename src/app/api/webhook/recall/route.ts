@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { callSessions } from "@/db/schema";
 import { inngest } from "@/inngest/client";
+import { verifySvixWebhook } from "@/lib/webhook-signature";
 
 type RecallPayload = {
   event?: string;
@@ -57,7 +58,30 @@ function statusFromRecall(
 }
 
 export async function POST(req: NextRequest) {
-  const payload = (await req.json()) as RecallPayload;
+  const secret = process.env.RECALL_WEBHOOK_SECRET;
+  const rawBody = await req.text();
+
+  if (secret) {
+    const valid = verifySvixWebhook({
+      id: req.headers.get("svix-id") ?? req.headers.get("webhook-id"),
+      timestamp:
+        req.headers.get("svix-timestamp") ?? req.headers.get("webhook-timestamp"),
+      signature:
+        req.headers.get("svix-signature") ?? req.headers.get("webhook-signature"),
+      body: rawBody,
+      secret,
+    });
+    if (!valid) {
+      return NextResponse.json({ ok: false }, { status: 401 });
+    }
+  } else {
+    console.warn(
+      "RECALL_WEBHOOK_SECRET is not set — accepting this webhook unverified. " +
+        "Set it from the Recall dashboard's webhook signing secret to close this gap.",
+    );
+  }
+
+  const payload = JSON.parse(rawBody) as RecallPayload;
   const botId =
     payload.data?.bot?.id ||
     payload.data?.bot_id ||
@@ -108,12 +132,17 @@ export async function POST(req: NextRequest) {
   }
 
   const shouldProcess =
-    nextStatus === "processing" ||
-    payload.event === "recording.done" ||
-    Boolean(recordingUrl && session.status !== "completed");
+    session.status !== "completed" &&
+    (nextStatus === "processing" ||
+      payload.event === "recording.done" ||
+      Boolean(recordingUrl));
 
   if (shouldProcess) {
     await inngest.send({
+      // Stable per session+status so Recall's webhook retries (and duplicate
+      // event types carrying the same transition) dedupe instead of
+      // re-processing and creating duplicate episodes/promises.
+      id: `recall-${session.id}-${nextStatus ?? "recording"}`,
       name: "sessions/processing",
       data: {
         sessionId: session.id,

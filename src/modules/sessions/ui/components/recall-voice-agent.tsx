@@ -51,6 +51,7 @@ export function RecallVoiceAgent() {
     let playbackTime = 0;
     const sources: AudioBufferSourceNode[] = [];
     const pendingTools: PendingTool[] = [];
+    let recallWs: WebSocket | null = null;
 
     const postLive = (next: {
       liveYou?: string;
@@ -124,6 +125,13 @@ export function RecallVoiceAgent() {
       wsRef.current = ws;
       let ready = false;
 
+      ws.addEventListener("error", () => {
+        setStatus("disconnected — reload to rejoin");
+      });
+      ws.addEventListener("close", () => {
+        setStatus((s) => (s === "ended" ? s : "disconnected — reload to rejoin"));
+      });
+
       worklet.port.onmessage = (event) => {
         if (!ready || ws.readyState !== WebSocket.OPEN) return;
         const b64 = bytesToBase64(new Uint8Array(event.data as ArrayBuffer));
@@ -132,9 +140,12 @@ export function RecallVoiceAgent() {
       source.connect(worklet);
 
       try {
-        const recallWs = new WebSocket(
+        recallWs = new WebSocket(
           "wss://meeting-data.bot.recall.ai/api/v1/transcript",
         );
+        recallWs.onerror = () => {
+          /* best-effort captions socket — not available in every context */
+        };
         recallWs.onmessage = (event) => {
           try {
             const payload = JSON.parse(event.data as string) as {
@@ -165,6 +176,15 @@ export function RecallVoiceAgent() {
               input: {
                 format: { encoding: "audio/pcm" },
                 keyterms: session.keyterms,
+                // Multi-speaker Meet room, not a close-talking headset — pairs
+                // with client-side noiseSuppression:false below (rely on the
+                // server-side focus instead of double-processing the audio).
+                voice_focus: "far-field",
+                // Wake-word-gated bot in a noisy room: bias toward not
+                // cutting off a name mid-utterance over responding quickly.
+                // Verify live — reusing Conservative-profile numbers from a
+                // related but distinct AssemblyAI API by analogy.
+                turn_detection: { min_silence: 800, max_silence: 3600 },
               },
               output: {
                 voice: "alba",
@@ -237,27 +257,39 @@ export function RecallVoiceAgent() {
           playbackTime = Math.max(playbackTime, now);
           src.start(playbackTime);
           playbackTime += buffer.duration;
+          src.onended = () => {
+            const i = sources.indexOf(src);
+            if (i !== -1) sources.splice(i, 1);
+          };
           sources.push(src);
         } else if (msg.type === "tool.call" && msg.call_id && msg.name) {
           setYou(`tool: ${msg.name}`);
           postLive({ liveYou: `tool: ${msg.name}` });
-          const toolRes = await fetch(
-            `/api/agent/tools?k=${encodeURIComponent(k)}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                name: msg.name,
-                arguments: msg.arguments ?? {},
-              }),
-            },
-          );
-          const json = (await toolRes.json()) as { result?: unknown };
-          pendingTools.push({
-            call_id: msg.call_id,
-            result: JSON.stringify(json.result ?? json),
-            is_error: !toolRes.ok,
-          });
+          try {
+            const toolRes = await fetch(
+              `/api/agent/tools?k=${encodeURIComponent(k)}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  name: msg.name,
+                  arguments: msg.arguments ?? {},
+                }),
+              },
+            );
+            const json = (await toolRes.json()) as { result?: unknown };
+            pendingTools.push({
+              call_id: msg.call_id,
+              result: JSON.stringify(json.result ?? json),
+              is_error: !toolRes.ok,
+            });
+          } catch {
+            pendingTools.push({
+              call_id: msg.call_id,
+              result: JSON.stringify({ error: "tool call failed" }),
+              is_error: true,
+            });
+          }
         } else if (msg.type === "session.error" || msg.type === "error") {
           setStatus(msg.message || "session error");
         } else if (msg.type === "session.ended") {
@@ -287,6 +319,9 @@ export function RecallVoiceAgent() {
       onHide();
       stream?.getTracks().forEach((track) => track.stop());
       void audioCtx?.close();
+      if (recallWs && recallWs.readyState === WebSocket.OPEN) {
+        recallWs.close();
+      }
     };
   }, [k]);
 

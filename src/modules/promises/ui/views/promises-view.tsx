@@ -1,24 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/loading-state";
+import { useSetPromiseStatusMutation } from "@/modules/promises/hooks/use-set-promise-status";
 import { useTRPC } from "@/trpc/client";
 
 export function PromisesView() {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const list = useQuery(trpc.promises.getMany.queryOptions({ status: "open" }));
-  const setStatus = useMutation(
-    trpc.promises.setStatus.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries();
-      },
-    }),
-  );
+  const setStatus = useSetPromiseStatusMutation();
 
   if (list.isPending) {
     return <LoadingState title="Loading promises" description="Open follow-through" />;
