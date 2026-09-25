@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { OctagonAlertIcon } from "lucide-react";
-import { FaGithub, FaGoogle } from "react-icons/fa";
+import { FaGoogle } from "react-icons/fa";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { Input } from "@/components/ui/input";
@@ -75,7 +75,7 @@ export const SignUpView = () => {
 
   };
 
-  const onSocial = (provider: "github" | "google") => {
+  const onSocial = (provider: "google") => {
     setError(null);
     setPending(true);
 
@@ -198,14 +198,14 @@ export const SignUpView = () => {
                   type="submit"
                   className="w-full"
                 >
-                  Sign in
+                  Sign up
                 </Button>
                 <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
                   <span className="bg-card text-muted-foreground relative z-10 px-2">
                     Or continue with
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <Button
                     disabled={pending}
                     onClick={() => onSocial("google")}
@@ -214,15 +214,6 @@ export const SignUpView = () => {
                     className="w-full"
                   >
                     <FaGoogle />
-                  </Button>
-                  <Button
-                    onClick={() => onSocial("github")}
-                    disabled={pending}
-                    variant="outline"
-                    type="button"
-                    className="w-full"
-                  >
-                    <FaGithub />
                   </Button>
                 </div>
                 <div className="text-center text-sm">

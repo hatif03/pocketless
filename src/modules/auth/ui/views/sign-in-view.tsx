@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { OctagonAlertIcon } from "lucide-react";
-import { FaGithub, FaGoogle } from "react-icons/fa";
+import { FaGoogle } from "react-icons/fa";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { Input } from "@/components/ui/input";
@@ -65,7 +65,7 @@ export const SignInView = () => {
     );
   };
 
-  const onSocial = (provider: "github" | "google") => {
+  const onSocial = (provider: "google") => {
     setError(null);
     setPending(true);
 
@@ -157,7 +157,7 @@ export const SignInView = () => {
                     Or continue with
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <Button
                     disabled={pending}
                     onClick={() => onSocial("google")}
@@ -166,15 +166,6 @@ export const SignInView = () => {
                     className="w-full"
                   >
                     <FaGoogle />
-                  </Button>
-                  <Button
-                    disabled={pending}
-                    onClick={() => onSocial("github")}
-                    variant="outline"
-                    type="button"
-                    className="w-full"
-                  >
-                    <FaGithub />
                   </Button>
                 </div>
                 <div className="text-center text-sm">
