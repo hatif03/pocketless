@@ -3,7 +3,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { HandshakeIcon, RadioIcon, UsersIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -18,14 +17,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { dashboardNavItems, isNavItemActive } from "@/modules/dashboard/nav-items";
 
 import { DashboardUserButton } from "./dashboard-user-button";
-
-const items = [
-  { icon: UsersIcon, label: "People", href: "/" },
-  { icon: HandshakeIcon, label: "Promises", href: "/promises" },
-  { icon: RadioIcon, label: "Sessions", href: "/sessions" },
-];
 
 export const DashboardSidebar = () => {
   const pathname = usePathname();
@@ -45,11 +39,8 @@ export const DashboardSidebar = () => {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => {
-                const active =
-                  item.href === "/"
-                    ? pathname === "/" || pathname.startsWith("/people")
-                    : pathname.startsWith(item.href);
+              {dashboardNavItems.map((item) => {
+                const active = isNavItemActive(item.href, pathname);
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton

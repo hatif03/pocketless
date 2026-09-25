@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { episodes, people, promises } from "@/db/schema";
+import { indexEpisode } from "@/lib/memory/index-episode";
 
 const MARCH_QUOTE =
   "In March Priya said she would rather we ship the memory graph before we add another OAuth.";
@@ -30,7 +31,9 @@ export async function seedPriyaForUser(userId: string) {
     })
     .returning();
 
-  await db.insert(episodes).values([
+  const seededEpisodes = await db
+    .insert(episodes)
+    .values([
     {
       userId,
       personId: priya.id,
@@ -61,7 +64,8 @@ export async function seedPriyaForUser(userId: string) {
       topics: "follow-up, one-pager",
       occurredAt: new Date("2026-08-21T16:30:00Z"),
     },
-  ]);
+  ])
+    .returning({ id: episodes.id });
 
   await db.insert(promises).values({
     userId,
@@ -70,6 +74,10 @@ export async function seedPriyaForUser(userId: string) {
     status: "open",
     dueAt: new Date("2026-09-20T17:00:00Z"),
   });
+
+  for (const episode of seededEpisodes) {
+    await indexEpisode(episode.id);
+  }
 
   return priya.id;
 }

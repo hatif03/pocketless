@@ -177,4 +177,19 @@ export const episodesRouter = createTRPCRouter({
       }
       return row;
     }),
+  setYouSpeaker: protectedProcedure
+    .input(z.object({ id: z.string(), speaker: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await db
+        .update(episodes)
+        .set({ youSpeakerLabel: input.speaker })
+        .where(
+          and(eq(episodes.id, input.id), eq(episodes.userId, ctx.auth.user.id)),
+        )
+        .returning();
+      if (!updated) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      return updated;
+    }),
 });

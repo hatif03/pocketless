@@ -1,5 +1,6 @@
 import { SidebarProvider } from "@/components/ui/sidebar";
 
+import { DashboardBottomNav } from "@/modules/dashboard/ui/components/dashboard-bottom-nav";
 import { DashboardNavbar } from "@/modules/dashboard/ui/components/dashboard-navbar";
 import { DashboardSidebar } from "@/modules/dashboard/ui/components/dashboard-sidebar";
 
@@ -8,12 +9,13 @@ interface Props {
 }
 
 const Layout = ({ children }: Props) => {
-  return ( 
+  return (
     <SidebarProvider>
       <DashboardSidebar />
       <main className="flex flex-col h-screen w-screen bg-muted">
         <DashboardNavbar />
-        {children}
+        <div className="flex-1 overflow-y-auto pb-16 md:pb-0">{children}</div>
+        <DashboardBottomNav />
       </main>
     </SidebarProvider>
   );

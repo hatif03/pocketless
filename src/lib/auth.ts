@@ -13,6 +13,11 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      // Login only requests email/profile (see socialProviders default scopes).
+      // Calendar/Gmail scopes are requested separately via authClient.linkSocial
+      // from the settings page, so signing in with Google never prompts for them.
+      accessType: "offline",
+      prompt: "select_account+consent",
     },
   },
   emailAndPassword: {

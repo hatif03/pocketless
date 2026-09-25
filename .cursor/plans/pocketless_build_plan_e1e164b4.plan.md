@@ -4,31 +4,31 @@ overview: Create a public GitHub repo, strip Polar (no payments until RevenueCat
 todos:
   - id: repo-init
     content: git init, first commit, gh repo create pocketless --public, push
-    status: in_progress
+    status: completed
   - id: deps
     content: Bump remaining deps to latest stable (Next 16.3.x, no cacheComponents); add assemblyai; remove Stream/Polar packages; fix build
-    status: in_progress
+    status: completed
   - id: remove-polar
     content: Remove Polar packages, plugin, upgrade/trial UI, premiumProcedure; ungated creates
-    status: pending
+    status: completed
   - id: after-list
     content: Write docs/after-hackathon.md (Zoom/Teams adapters, companion, RevenueCat, OAuth, RAG, never host a room)
-    status: pending
+    status: completed
   - id: schema-seed
     content: people, episodes, promises, decisions, sessions (meeting URL + bot id) + Priya seed
-    status: pending
+    status: completed
   - id: home-roster
     content: Home = people + promises; sidebar; person card; relocate transcript/recording
-    status: pending
+    status: completed
   - id: meeting-bot
     content: Paste Google Meet URL only → Recall bot join; reject Zoom/Teams in UI; session observer; no Stream room
-    status: pending
+    status: completed
   - id: voice-agent
     content: Recall Output Media webpage → AssemblyAI Voice Agent (24 kHz PCM, wake-name, TTS into the meeting)
-    status: pending
+    status: completed
   - id: tools-pipeline
     content: In-call tools + Inngest post-call STT/Gateway brief/promises; Talk to Pocketless
-    status: pending
+    status: completed
 isProject: false
 ---
 

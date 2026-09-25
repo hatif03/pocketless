@@ -45,3 +45,4 @@ next-env.d.ts
 
 # local agent junk
 *.canvas.data.json
+.env*

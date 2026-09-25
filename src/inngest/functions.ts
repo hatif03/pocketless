@@ -25,18 +25,18 @@ export const sessionProcessing = inngest.createFunction(
       return { skipped: true };
     }
 
-    let transcript = "";
+    let transcription: Awaited<ReturnType<typeof transcribeRecording>> | null =
+      null;
     if (recordingUrl) {
-      const result = await step.run("transcribe", async () => {
+      transcription = await step.run("transcribe", async () => {
         const names = ["Pocketless"];
         return transcribeRecording(recordingUrl, names);
       });
-      transcript = result.transcript;
     }
 
-    if (transcript) {
+    if (transcription?.transcript) {
       await step.run("brief", async () => {
-        await writePostSessionBrief(sessionId, transcript);
+        await writePostSessionBrief(sessionId, transcription!);
       });
     }
 

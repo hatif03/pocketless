@@ -1,5 +1,12 @@
 import { nanoid } from "nanoid";
-import { pgTable, text, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  pgEnum,
+  integer,
+} from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -170,7 +177,34 @@ export const episodes = pgTable("episodes", {
   transcript: text("transcript"),
   transcriptJson: text("transcript_json"),
   topics: text("topics"),
+  entitiesJson: text("entities_json"),
+  sentimentJson: text("sentiment_json"),
+  youSpeakerLabel: text("you_speaker_label"),
   occurredAt: timestamp("occurred_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const chunkKind = pgEnum("chunk_kind", ["brief", "transcript_chunk"]);
+
+export const memoryChunks = pgTable("memory_chunks", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  personId: text("person_id")
+    .notNull()
+    .references(() => people.id, { onDelete: "cascade" }),
+  episodeId: text("episode_id")
+    .notNull()
+    .references(() => episodes.id, { onDelete: "cascade" }),
+  kind: chunkKind("kind").notNull(),
+  content: text("content").notNull(),
+  speaker: text("speaker"),
+  startMs: integer("start_ms"),
+  endMs: integer("end_ms"),
+  chunkIndex: integer("chunk_index").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

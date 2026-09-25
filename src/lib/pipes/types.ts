@@ -49,7 +49,7 @@ export const voiceAgentTools = [
     type: "function" as const,
     name: "draft_email",
     description:
-      "Call this when asked to email someone. This is a mock send for the hackathon.",
+      "Call this when asked to email someone. Creates a real Gmail draft (never auto-sent) if the user has connected Gmail, otherwise holds a mock placeholder.",
     parameters: {
       type: "object",
       properties: {
@@ -64,14 +64,21 @@ export const voiceAgentTools = [
     type: "function" as const,
     name: "hold_calendar",
     description:
-      "Call this when asked to put something on the calendar. Mock hold only.",
+      "Call this when asked to put something on the calendar. Creates a real Google Calendar event if the user has connected Google Calendar, otherwise holds a mock placeholder.",
     parameters: {
       type: "object",
       properties: {
         title: { type: "string" },
-        when: { type: "string" },
+        startTime: {
+          type: "string",
+          description: "ISO 8601 date-time, e.g. 2026-09-25T15:00:00-07:00",
+        },
+        endTime: {
+          type: "string",
+          description: "ISO 8601 date-time, e.g. 2026-09-25T15:30:00-07:00",
+        },
       },
-      required: ["title"],
+      required: ["title", "startTime", "endTime"],
     },
   },
   {

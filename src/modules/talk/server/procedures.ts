@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { episodes, people, promises, talkMessages } from "@/db/schema";
 import { gatewayChat } from "@/lib/assemblyai/gateway";
+import { searchMemory } from "@/lib/memory/search";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 export const talkRouter = createTRPCRouter({
@@ -50,6 +51,13 @@ export const talkRouter = createTRPCRouter({
         content: input.content,
       });
 
+      const passages = await searchMemory({
+        userId: ctx.auth.user.id,
+        personId: person.id,
+        query: input.content,
+        k: 8,
+      }).catch(() => []);
+
       const [open, recent, prior] = await Promise.all([
         db
           .select()
@@ -87,6 +95,11 @@ export const talkRouter = createTRPCRouter({
               `- ${e.title} (${e.occurredAt.toISOString().slice(0, 10)}): ${e.brief ?? e.transcript?.slice(0, 400)}`,
           )
           .join("\n")}`,
+        `Relevant excerpts for this question:\n${
+          passages
+            .map((p) => `- ${p.speaker ? `${p.speaker}: ` : ""}${p.content}`)
+            .join("\n") || "(none)"
+        }`,
       ].join("\n\n");
 
       const reply = await gatewayChat({

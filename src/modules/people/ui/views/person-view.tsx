@@ -17,6 +17,7 @@ import { LoadingState } from "@/components/loading-state";
 import { ErrorState } from "@/components/error-state";
 import { useTRPC } from "@/trpc/client";
 import { SendPocketlessDialog } from "@/modules/sessions/ui/components/send-pocketless-dialog";
+import { MindMap } from "@/modules/people/ui/components/mind-map";
 import { Badge } from "@/components/ui/badge";
 
 export function PersonView() {
@@ -34,6 +35,7 @@ export function PersonView() {
     trpc.promises.getMany.queryOptions({ personId }),
   );
   const talk = useQuery(trpc.talk.history.queryOptions({ personId }));
+  const graph = useQuery(trpc.people.graph.queryOptions({ personId }));
   const send = useMutation(
     trpc.talk.send.mutationOptions({
       onSuccess: () => {
@@ -100,6 +102,7 @@ export function PersonView() {
             <TabsTrigger value="talk">Talk to Pocketless</TabsTrigger>
             <TabsTrigger value="promises">Promises</TabsTrigger>
             <TabsTrigger value="episodes">Episodes</TabsTrigger>
+            <TabsTrigger value="mind-map">Mind map</TabsTrigger>
           </TabsList>
           <TabsContent value="talk" className="bg-background rounded-lg border p-4">
             <ScrollArea className="h-[320px] pr-3">
@@ -178,6 +181,9 @@ export function PersonView() {
                 </p>
               </Link>
             ))}
+          </TabsContent>
+          <TabsContent value="mind-map" className="bg-background rounded-lg border p-4">
+            <MindMap nodes={graph.data?.nodes ?? []} edges={graph.data?.edges ?? []} />
           </TabsContent>
         </Tabs>
       </div>

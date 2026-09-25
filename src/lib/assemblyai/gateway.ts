@@ -11,6 +11,26 @@ export async function gatewayChat(input: {
     throw new Error("ASSEMBLYAI_API_KEY is not set");
   }
 
+  // qwen3.5-4b-32k-fast is the only model this AssemblyAI free-tier account
+  // has Gateway access to. It doesn't support response_format (JSON output
+  // relies on prompting, with a fallback in callers if parsing fails) and
+  // requires the system message to be first, so the JSON instruction is
+  // folded into the existing leading system message rather than appended.
+  const JSON_INSTRUCTION =
+    "Respond with ONLY valid JSON. No markdown, no code fences, no explanation before or after.";
+  const messages =
+    input.json && input.messages[0]?.role === "system"
+      ? [
+          {
+            ...input.messages[0],
+            content: `${input.messages[0].content}\n\n${JSON_INSTRUCTION}`,
+          },
+          ...input.messages.slice(1),
+        ]
+      : input.json
+        ? [{ role: "system" as const, content: JSON_INSTRUCTION }, ...input.messages]
+        : input.messages;
+
   const response = await fetch(GATEWAY, {
     method: "POST",
     headers: {
@@ -18,11 +38,8 @@ export async function gatewayChat(input: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      messages: input.messages,
-      ...(input.json
-        ? { response_format: { type: "json_object" } }
-        : {}),
+      model: "qwen3.5-4b-32k-fast",
+      messages,
     }),
   });
 

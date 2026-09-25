@@ -12,7 +12,10 @@ Then `.claude/skills/assemblyai/SKILL.md`. Voice Agent API uses `Authorization: 
 
 ```bash
 claude mcp add assemblyai-docs --transport http https://assemblyai.com/docs/mcp
+claude mcp add recall-ai --transport http https://ap-northeast-1.recall.ai/mcp
 ```
+
+Recall MCP region must match the workspace this account's bot/API calls actually run in (`ap-northeast-1` here — see [docs.recall.ai/docs/docs-mcp](https://docs.recall.ai/docs/docs-mcp)). Other regions: `us-east-1`, `us-west-2`, `eu-central-1`.
 
 ## Do not
 

@@ -10,6 +10,13 @@ import {
   promises,
 } from "@/db/schema";
 import { gatewayChat } from "@/lib/assemblyai/gateway";
+import type {
+  TranscriptEntity,
+  TranscriptSentiment,
+} from "@/lib/assemblyai/transcribe";
+import { indexEpisode } from "@/lib/memory/index-episode";
+import { searchMemory } from "@/lib/memory/search";
+import { createCalendarEvent, createGmailDraft } from "@/lib/google/calendar-gmail";
 
 export async function runAgentTool(input: {
   sessionId: string;
@@ -42,30 +49,25 @@ export async function runAgentTool(input: {
       .select()
       .from(people)
       .where(eq(people.id, personId));
-    const [open, recent] = await Promise.all([
+    const [open, passages] = await Promise.all([
       db
         .select()
         .from(promises)
         .where(
           and(eq(promises.personId, personId), eq(promises.status, "open")),
         ),
-      db
-        .select()
-        .from(episodes)
-        .where(eq(episodes.personId, personId))
-        .orderBy(desc(episodes.occurredAt))
-        .limit(5),
+      query.trim()
+        ? searchMemory({ userId: session.userId, personId, query, k: 5 })
+        : Promise.resolve([]),
     ]);
     return {
       person: person?.name,
       brief: person?.relationshipBrief,
       query,
       openPromises: open.map((p) => p.text),
-      episodes: recent.map((e) => ({
-        title: e.title,
-        occurredAt: e.occurredAt,
-        brief: e.brief,
-        excerpt: e.transcript?.slice(0, 600),
+      passages: passages.map((p) => ({
+        speaker: p.speaker,
+        text: p.content,
       })),
     };
   }
@@ -101,26 +103,53 @@ export async function runAgentTool(input: {
 
   if (input.name === "draft_email") {
     const payload = {
-      to: input.args.to ?? null,
-      subject: input.args.subject,
-      body: input.args.body,
+      to: input.args.to ? String(input.args.to) : undefined,
+      subject: String(input.args.subject ?? ""),
+      body: String(input.args.body ?? ""),
     };
+    try {
+      const draft = await createGmailDraft({ userId: session.userId, ...payload });
+      if (draft) {
+        return { ok: true, mocked: false, draftId: draft.id, ...payload };
+      }
+    } catch (error) {
+      console.error("Gmail draft failed, falling back to mock", error);
+    }
     await db.insert(mockOutbox).values({
       userId: session.userId,
       kind: "email",
       payload: JSON.stringify(payload),
     });
-    return { ok: true, mocked: true, ...payload };
+    return { ok: true, mocked: true, reason: "not_connected", ...payload };
   }
 
   if (input.name === "hold_calendar") {
-    const payload = { title: input.args.title, when: input.args.when };
+    const payload = {
+      title: String(input.args.title ?? ""),
+      startTime: input.args.startTime ? String(input.args.startTime) : undefined,
+      endTime: input.args.endTime ? String(input.args.endTime) : undefined,
+    };
+    if (payload.startTime && payload.endTime) {
+      try {
+        const event = await createCalendarEvent({
+          userId: session.userId,
+          title: payload.title,
+          startTime: payload.startTime,
+          endTime: payload.endTime,
+        });
+        if (event) {
+          return { ok: true, mocked: false, eventUrl: event.url, ...payload };
+        }
+      } catch (error) {
+        console.error("Calendar event failed, falling back to mock", error);
+      }
+    }
     await db.insert(mockOutbox).values({
       userId: session.userId,
       kind: "calendar",
       payload: JSON.stringify(payload),
     });
-    return { ok: true, mocked: true, ...payload };
+    return { ok: true, mocked: true, reason: "not_connected", ...payload };
   }
 
   if (input.name === "note_decision") {
@@ -166,11 +195,20 @@ export async function buildVoiceSystemPrompt(sessionId: string) {
   }
 
   return `You are Pocketless, a coworker in a live Google Meet. You are silent by default. Do not greet. Do not speak unless a human addresses you with the wake name Pocketless.
-When woken, be brief. Use tools for memory, promises, mock email, and mock calendar instead of inventing facts.
+When woken, be brief. Use tools for memory, promises, email, and calendar instead of inventing facts. Calendar/email tools require exact ISO 8601 start and end times — ask for a specific date and time if the person is vague.
 ${memory}`;
 }
 
-export async function writePostSessionBrief(sessionId: string, transcript: string) {
+export async function writePostSessionBrief(
+  sessionId: string,
+  data: {
+    transcript: string;
+    utterances?: { speaker?: string; text: string; start?: number; end?: number }[];
+    entities?: TranscriptEntity[];
+    sentimentResults?: TranscriptSentiment[];
+  },
+) {
+  const { transcript, utterances, entities, sentimentResults } = data;
   const [session] = await db
     .select()
     .from(callSessions)
@@ -197,23 +235,34 @@ export async function writePostSessionBrief(sessionId: string, transcript: strin
 
   let parsed: { brief?: string; promises?: string[]; topics?: string } = {};
   try {
-    parsed = JSON.parse(raw) as typeof parsed;
+    // No structured-output mode on this account's Gateway model — strip a
+    // ```json fence if the model added one despite being asked not to.
+    const stripped = raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
+    parsed = JSON.parse(stripped) as typeof parsed;
   } catch {
     parsed = { brief: raw.slice(0, 1200), promises: [], topics: "" };
   }
 
   const brief = parsed.brief?.trim() || person?.relationshipBrief || raw.slice(0, 800);
 
-  await db.insert(episodes).values({
-    userId: session.userId,
-    personId: session.personId,
-    sessionId: session.id,
-    title: `Google Meet with ${person?.name ?? "them"}`,
-    brief,
-    transcript,
-    topics: parsed.topics,
-    occurredAt: session.startedAt ?? new Date(),
-  });
+  const [episode] = await db
+    .insert(episodes)
+    .values({
+      userId: session.userId,
+      personId: session.personId,
+      sessionId: session.id,
+      title: `Google Meet with ${person?.name ?? "them"}`,
+      brief,
+      transcript,
+      transcriptJson: utterances ? JSON.stringify(utterances) : null,
+      topics: parsed.topics,
+      entitiesJson: entities?.length ? JSON.stringify(dedupeEntities(entities)) : null,
+      sentimentJson: sentimentResults?.length
+        ? JSON.stringify(sentimentResults)
+        : null,
+      occurredAt: session.startedAt ?? new Date(),
+    })
+    .returning();
 
   await db
     .update(people)
@@ -233,4 +282,18 @@ export async function writePostSessionBrief(sessionId: string, transcript: strin
       sourceSessionId: session.id,
     });
   }
+
+  await indexEpisode(episode.id);
+}
+
+function dedupeEntities(entities: TranscriptEntity[]) {
+  const seen = new Set<string>();
+  const deduped: TranscriptEntity[] = [];
+  for (const entity of entities) {
+    const key = `${entity.entity_type}:${entity.text.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(entity);
+  }
+  return deduped;
 }
